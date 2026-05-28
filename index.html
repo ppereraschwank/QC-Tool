@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0078D4">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="QC Tool">
+  <title>Heater QC Tool - Serial Barcode Mode</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    :root {
+      --bg:#f4f6f8; --card:#ffffff; --line:#d9dee5; --text:#1f2937; --muted:#667085;
+      --primary:#0078D4; --primary-dark:#005fa3; --success:#027a48; --success-soft:#ecfdf3;
+      --warn:#9a6700; --warn-soft:#fffaeb; --danger:#b42318; --danger-soft:#fef3f2;
+      --shadow:0 1px 3px rgba(0,0,0,.08), 0 8px 28px rgba(0,0,0,.06); --radius:16px; --tap:48px;
+    }
+    * { box-sizing:border-box; }
+    html, body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:Arial,sans-serif; }
+    body { padding:12px; }
+    .app { max-width:1180px; margin:0 auto; display:grid; gap:12px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:12px; }
+    h1 { margin:0; text-align:center; font-size:clamp(1.3rem, 1rem + 1.8vw, 2rem); }
+    h2, h3 { margin:0 0 10px; }
+    .subtle { color:var(--muted); font-size:.92rem; }
+    .split { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .status { min-height:46px; display:flex; align-items:center; padding:10px 12px; border-radius:12px; background:#eef6ff; color:#164c7e; }
+    .status.ok { background:var(--success-soft); color:var(--success); }
+    .status.warn { background:var(--warn-soft); color:var(--warn); }
+    .status.err { background:var(--danger-soft); color:var(--danger); }
+    .hero-grid { display:grid; grid-template-columns:1.1fr .9fr; gap:12px; }
+    .scan-panel { border:2px dashed #9fc9ef; border-radius:16px; padding:20px; background:#f8fbff; min-height:220px; display:grid; align-content:center; justify-items:center; gap:12px; text-align:center; }
+    .scan-icon { width:84px; height:84px; border-radius:50%; display:grid; place-items:center; background:white; border:1px solid var(--line); font-size:2rem; }
+    .live-pill { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:white; font-weight:700; }
+    .dot { width:10px; height:10px; border-radius:50%; background:var(--success); box-shadow:0 0 0 0 rgba(2,122,72,.7); animation:pulse 1.6s infinite; }
+    @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(2,122,72,.7);} 70% { box-shadow:0 0 0 10px rgba(2,122,72,0);} 100% { box-shadow:0 0 0 0 rgba(2,122,72,0);} }
+    .scanner-box, .big-value { width:100%; min-height:58px; border:1px solid var(--line); border-radius:14px; padding:14px; font-size:1.08rem; background:white; text-align:center; font-weight:700; }
+    .scanner-focus { outline:3px solid rgba(0,120,212,.25); }
+    .button-row { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; margin-top:10px; }
+    button { min-height:var(--tap); border:0; border-radius:12px; padding:12px 14px; font-size:1rem; font-weight:700; cursor:pointer; background:var(--primary); color:white; }
+    button:hover { background:var(--primary-dark); }
+    button.secondary { background:#475467; }
+    button.secondary:hover { background:#344054; }
+    button.ghost { background:#e8eef5; color:#183b56; }
+    button.ghost:hover { background:#d9e5f1; }
+    button.success { background:var(--success); }
+    button.hidden { display:none; }
+    .field label { display:block; margin-bottom:6px; font-size:.85rem; color:var(--muted); }
+    .field input, .field textarea { width:100%; min-height:46px; border:1px solid var(--line); border-radius:12px; padding:11px 12px; font-size:16px; background:white; }
+    .quick-fields { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; }
+    .meta-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; }
+    .inline-switch { display:inline-flex; gap:8px; align-items:center; background:#f8fafc; border:1px solid var(--line); border-radius:999px; padding:8px 12px; }
+    .row-chooser { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:10px; }
+    .row-pill { min-height:var(--tap); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:1rem; font-weight:700; cursor:pointer; background:#f8fafc; color:var(--text); }
+    .row-pill.active { background:var(--primary); color:white; border-color:var(--primary); }
+    .row-pill.done { background:#eef6ff; color:#164c7e; }
+    .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:14px; background:white; }
+    table { width:100%; min-width:780px; border-collapse:collapse; }
+    th, td { border-bottom:1px solid #edf1f5; border-right:1px solid #edf1f5; padding:8px; text-align:center; vertical-align:middle; }
+    thead th { position:sticky; top:0; background:#f9fafb; z-index:1; font-size:.86rem; }
+    tr:last-child td, th:last-child, td:last-child { border-right:0; }
+    td input[type="text"], td input[type="number"] { width:100%; min-height:42px; border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:16px; }
+    td input[type="checkbox"] { width:22px; height:22px; accent-color:var(--primary); }
+    tfoot td { background:#fafbfc; }
+    .criteria-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; text-align:left; }
+    .criteria-item { display:flex; align-items:center; gap:10px; min-height:42px; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:white; }
+    .criteria-item input { width:22px; height:22px; accent-color:var(--primary); }
+    .tiny { font-size:.83rem; color:var(--muted); }
+    #sig { width:100%; height:auto; border:1px solid var(--line); border-radius:14px; background:white; touch-action:none; display:block; }
+    dialog { border:0; border-radius:16px; padding:0; box-shadow:var(--shadow); width:min(520px, 92vw); }
+    dialog::backdrop { background:rgba(0,0,0,.35); }
+    .modal { padding:18px; }
+    .modal h3 { margin:0 0 10px; }
+    .modal-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+    @media (max-width: 960px) {
+      body { padding:10px; }
+      .hero-grid, .quick-fields, .meta-grid, .button-row, .criteria-grid, .modal-actions { grid-template-columns:1fr; }
+      .row-chooser { grid-template-columns:repeat(3, minmax(0,1fr)); }
+      .card { padding:10px; }
+      table { min-width:620px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="card split">
+      <div>
+        <h1>Heater QC Tool - Serial Barcode Mode</h1>
+        <div class="subtle">Scan the barcode to fill <strong>Serial Number #</strong>, or type it manually. The app automatically writes to the first available row and moves downward. The one-time QC checklist at the bottom applies to all units listed above.</div>
+      </div>
+      <div><button id="installBtn" class="success hidden">Install App</button></div>
+    </div>
+
+    <div class="card hero-grid">
+      <div>
+        <h2>Scan or Enter Manually</h2>
+        <div class="scan-panel">
+          <div class="scan-icon">🔢</div>
+          <div class="live-pill"><span class="dot"></span> Scanner listening</div>
+          <div class="subtle">Use the scanner here, or type/paste a serial number and press Enter / Add Manual Entry.</div>
+          <div class="field" style="width:100%; max-width:620px;">
+            <label>Scanner / manual input</label>
+            <input id="scannerInput" class="scanner-box scanner-focus" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Scan, type, or paste serial number here">
+          </div>
+          <div class="button-row" style="width:100%; max-width:620px; grid-template-columns:repeat(2,minmax(0,1fr));">
+            <button id="addManualBtn">Add Manual Entry</button>
+            <button id="refocusBtn" class="ghost">🎯 Re-focus Scanner</button>
+          </div>
+          <div class="field" style="width:100%; max-width:620px;">
+            <label>Last scanned / entered value</label>
+            <input id="lastScannedValue" class="big-value" readonly>
+          </div>
+          <div class="tiny">Best with a scanner in keyboard-wedge mode. This version can process scans with Enter suffix or after a short idle pause, and also allows manual entry.</div>
+        </div>
+        <div id="scanStatus" class="status" style="margin-top:10px;">Waiting for barcode scan or manual entry…</div>
+      </div>
+      <div>
+        <h3>Current Output</h3>
+        <div class="quick-fields">
+          <div class="field"><label>Serial Number #</label><input id="previewSerial" readonly></div>
+          <div class="field"><label>Ground Continuity (V)</label><input id="previewGround" readonly></div>
+          <div class="field"><label>Hi-Pot (A)</label><input id="previewHipot" readonly></div>
+        </div>
+        <div class="meta-grid" style="margin-top:12px;">
+          <div class="inline-switch"><input type="checkbox" id="fillOnlyEmpty" checked><label for="fillOnlyEmpty">Fill only empty serial fields</label></div>
+          <div class="inline-switch"><input type="checkbox" id="autoAdvance" checked><label for="autoAdvance">Auto-advance row</label></div>
+          <div class="inline-switch"><input type="checkbox" id="lockFocus" checked><label for="lockFocus">Keep scanner ready</label></div>
+          <div class="inline-switch"><input type="checkbox" id="enterRequired"><label for="enterRequired">Require Enter suffix</label></div>
+        </div>
+        <div class="button-row">
+          <button id="nextRowBtn" class="ghost">➡ Next Row</button>
+          <button id="clearLastBtn" class="secondary">🧹 Clear Last Value</button>
+          <button id="clearCurrentRowBtn" class="secondary">🗑 Clear Current Row</button>
+          <button id="addBlankRowBtn" class="ghost">➕ Keep Current Row</button>
+        </div>
+        <div id="installNote" class="tiny" style="margin-top:10px;"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="split">
+        <div>
+          <h2>Active Row</h2>
+          <div class="subtle">The app scans or enters into the first row whose <strong>Serial Number #</strong> is blank. You can also click a row below to manually work on it.</div>
+        </div>
+        <div class="inline-switch"><strong>Row</strong> <span id="activeRowNumber">1</span></div>
+      </div>
+      <div class="row-chooser" id="rowChooser"></div>
+    </div>
+
+    <div class="card">
+      <h2>QC Log</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Serial Number #</th>
+              <th>Ground Continuity (V)</th>
+              <th>Hi-Pot (A)</th>
+            </tr>
+          </thead>
+          <tbody id="qcTable"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3">
+                <div class="subtle" style="margin-bottom:10px; font-weight:700;">One-time QC checklist for all above units</div>
+                <div class="criteria-grid">
+                  <label class="criteria-item"><input type="checkbox" id="critVisual"><span>Visual Inspection</span></label>
+                  <label class="criteria-item"><input type="checkbox" id="critWiring"><span>Wiring Verification</span></label>
+                  <label class="criteria-item"><input type="checkbox" id="critLeak"><span>Leakage Test</span></label>
+                  <label class="criteria-item"><input type="checkbox" id="critNoise"><span>Noise/Vibration</span></label>
+                  <label class="criteria-item"><input type="checkbox" id="critNameplate"><span>Verify Nameplate</span></label>
+                  <label class="criteria-item"><input type="checkbox" id="critValve"><span>Shutoff Valve</span></label>
+                  <label class="criteria-item"><input type="checkbox" id="critFinalRun"><span>Final Run Test</span></label>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="quick-fields">
+        <div class="field"><label>Tester</label><input id="tester" placeholder="Enter tester name"></div>
+        <div class="field"><label>Signature</label><div class="tiny" style="padding-top:12px;">Sign below to certify that all listed units have been QC'd using the one-time checklist and the per-unit electrical values above.</div></div>
+        <div class="field"><label>Save behavior</label><div class="tiny" style="padding-top:12px;">You can save directly to a folder when supported, or download the QC log as JSON.</div></div>
+      </div>
+      <h3 style="margin-top:12px;">Signature</h3>
+      <canvas id="sig" width="700" height="220"></canvas>
+      <div class="button-row" style="grid-template-columns: repeat(4, minmax(0, 1fr));">
+        <button id="clearSigBtn" class="ghost">Clear Signature</button>
+        <button id="saveFolderBtn" class="secondary">Select Save Folder</button>
+        <button id="downloadBtn" class="ghost">Download JSON</button>
+        <button id="submitBtn">Submit QC Data</button>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="submitConfirmDialog">
+    <div class="modal">
+      <h3>Confirm Submission</h3>
+      <div class="subtle">Are you sure you want to submit this QC log? After a successful submission, the app will automatically clear the entire form for the next batch.</div>
+      <div id="submitSummary" class="subtle" style="margin-top:10px;"></div>
+      <div class="modal-actions">
+        <button id="cancelSubmitBtn" class="ghost">Cancel</button>
+        <button id="confirmSubmitBtn">Confirm Submit</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    const ROWS = 18;
+    const qcTable = document.getElementById('qcTable');
+    const rowChooser = document.getElementById('rowChooser');
+    const activeRowNumber = document.getElementById('activeRowNumber');
+    const previewSerial = document.getElementById('previewSerial');
+    const previewGround = document.getElementById('previewGround');
+    const previewHipot = document.getElementById('previewHipot');
+    const scannerInput = document.getElementById('scannerInput');
+    const lastScannedValue = document.getElementById('lastScannedValue');
+    const scanStatus = document.getElementById('scanStatus');
+    const fillOnlyEmptyEl = document.getElementById('fillOnlyEmpty');
+    const autoAdvanceEl = document.getElementById('autoAdvance');
+    const lockFocusEl = document.getElementById('lockFocus');
+    const enterRequiredEl = document.getElementById('enterRequired');
+    const installBtn = document.getElementById('installBtn');
+    const installNote = document.getElementById('installNote');
+    const submitDialog = document.getElementById('submitConfirmDialog');
+    const submitSummary = document.getElementById('submitSummary');
+
+    let activeRowIndex = 0;
+    let folderHandle = null;
+    let deferredPrompt = null;
+    let scanTimer = null;
+    let idleTimer = null;
+    let lastScanAt = 0;
+
+    function setStatus(message, kind='') {
+      scanStatus.className = `status ${kind}`.trim();
+      scanStatus.textContent = message;
+    }
+
+    function buildTable() {
+      qcTable.innerHTML = '';
+      rowChooser.innerHTML = '';
+      for (let i = 0; i < ROWS; i++) {
+        const tr = document.createElement('tr');
+        tr.dataset.rowIndex = i;
+        tr.innerHTML = `
+          <td><input type="text" autocomplete="off"></td>
+          <td><input type="number" step="0.01" inputmode="decimal"></td>
+          <td><input type="number" step="0.01" inputmode="decimal"></td>`;
+        qcTable.appendChild(tr);
+
+        const btn = document.createElement('button');
+        btn.className = 'row-pill';
+        btn.type = 'button';
+        btn.textContent = `Row ${i + 1}`;
+        btn.addEventListener('click', () => setActiveRow(i));
+        rowChooser.appendChild(btn);
+      }
+      qcTable.addEventListener('input', () => {
+        refreshRowChooserStates();
+        syncPreviewFromRow(activeRowIndex);
+      });
+    }
+
+    function getRowInputs(index) {
+      return qcTable.querySelectorAll('tr')[index]?.querySelectorAll('input') || [];
+    }
+
+    function rowHasAnyData(index) {
+      const inputs = getRowInputs(index);
+      return Array.from(inputs).some((input) => String(input.value || '').trim() !== '');
+    }
+
+    function findFirstAvailableRow() {
+      for (let i = 0; i < ROWS; i++) {
+        const inputs = getRowInputs(i);
+        if (inputs.length && !inputs[0].value.trim()) return i;
+      }
+      return ROWS - 1;
+    }
+
+    function findNextAvailableRow(start) {
+      for (let i = start + 1; i < ROWS; i++) {
+        const inputs = getRowInputs(i);
+        if (inputs.length && !inputs[0].value.trim()) return i;
+      }
+      return findFirstAvailableRow();
+    }
+
+    function setActiveRow(index) {
+      activeRowIndex = Math.max(0, Math.min(index, ROWS - 1));
+      activeRowNumber.textContent = String(activeRowIndex + 1);
+      refreshRowChooserStates();
+      syncPreviewFromRow(activeRowIndex);
+      const inputs = getRowInputs(activeRowIndex);
+      if (inputs.length) inputs[0].focus();
+    }
+
+    function refreshRowChooserStates() {
+      Array.from(rowChooser.children).forEach((btn, index) => {
+        btn.className = 'row-pill' + (index === activeRowIndex ? ' active' : '') + (rowHasAnyData(index) ? ' done' : '');
+      });
+    }
+
+    function syncPreviewFromRow(index) {
+      const inputs = getRowInputs(index);
+      if (!inputs.length) return;
+      previewSerial.value = inputs[0].value;
+      previewGround.value = inputs[1].value;
+      previewHipot.value = inputs[2].value;
+    }
+
+    function normalizeBarcode(value) {
+      return (value || '').trim().replace(/[\r\n]+/g, '').replace(/^\*|\*$/g, '').replace(/\s+/g, '').toUpperCase();
+    }
+
+    function fillSerialValue(rawValue, source='scan') {
+      const serial = normalizeBarcode(rawValue);
+      if (!serial) {
+        setStatus(`No serial number entered for manual entry.`, 'warn');
+        return;
+      }
+      const row = findFirstAvailableRow();
+      setActiveRow(row);
+      const inputs = getRowInputs(row);
+      if (!inputs.length) {
+        setStatus('No available row found.', 'err');
+        return;
+      }
+      if (fillOnlyEmptyEl.checked && inputs[0].value.trim()) {
+        setStatus(`Row ${row + 1} already has a serial number.`, 'warn');
+        return;
+      }
+      inputs[0].value = serial;
+      lastScannedValue.value = serial;
+      scannerInput.value = '';
+      refreshRowChooserStates();
+      syncPreviewFromRow(row);
+      setStatus(`${source === 'manual' ? 'Entered' : 'Scanned'} serial ${serial} into Row ${row + 1}.`, 'ok');
+      if (autoAdvanceEl.checked) setActiveRow(findNextAvailableRow(row));
+      keepScannerReady();
+    }
+
+    function keepScannerReady() {
+      if (!lockFocusEl.checked) return;
+      setTimeout(() => {
+        scannerInput.focus({ preventScroll: true });
+        scannerInput.classList.add('scanner-focus');
+      }, 0);
+    }
+
+    function clearCurrentRow() {
+      const inputs = getRowInputs(activeRowIndex);
+      if (!inputs.length) return;
+      inputs.forEach((el) => el.value = '');
+      refreshRowChooserStates();
+      syncPreviewFromRow(activeRowIndex);
+      setStatus(`Cleared Row ${activeRowIndex + 1}.`, 'ok');
+      keepScannerReady();
+    }
+
+    function clearWholeForm() {
+      // Clear table rows
+      Array.from(qcTable.querySelectorAll('tr')).forEach((tr) => {
+        tr.querySelectorAll('input').forEach((el) => el.value = '');
+      });
+      // Clear checklist
+      ['critVisual','critWiring','critLeak','critNoise','critNameplate','critValve','critFinalRun'].forEach((id) => {
+        document.getElementById(id).checked = false;
+      });
+      // Clear tester/signature/input/previews
+      document.getElementById('tester').value = '';
+      scannerInput.value = '';
+      lastScannedValue.value = '';
+      previewSerial.value = '';
+      previewGround.value = '';
+      previewHipot.value = '';
+      clearSig();
+      // Reset row state
+      setActiveRow(0);
+      refreshRowChooserStates();
+      keepScannerReady();
+    }
+
+    function processInputValue() {
+      const raw = scannerInput.value;
+      if (!raw.trim()) return;
+      if (enterRequiredEl.checked) return;
+      fillSerialValue(raw, 'scan');
+    }
+
+    scannerInput.addEventListener('input', () => {
+      clearTimeout(scanTimer);
+      scanTimer = setTimeout(processInputValue, 250);
+    });
+
+    scannerInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        fillSerialValue(scannerInput.value, 'manual');
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      const isTextContext = ['input', 'textarea'].includes(tag) && document.activeElement !== scannerInput;
+      if (isTextContext) return;
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const now = Date.now();
+        if (now - lastScanAt > 500) scannerInput.value = '';
+        lastScanAt = now;
+        if (document.activeElement !== scannerInput) scannerInput.value += e.key;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          if (!enterRequiredEl.checked && scannerInput.value.trim()) fillSerialValue(scannerInput.value, 'scan');
+        }, 300);
+      } else if (e.key === 'Enter' && document.activeElement !== scannerInput && scannerInput.value.trim()) {
+        e.preventDefault();
+        fillSerialValue(scannerInput.value, 'scan');
+      }
+    }, true);
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) setTimeout(keepScannerReady, 100);
+    });
+    document.addEventListener('click', () => {
+      if (lockFocusEl.checked && document.activeElement !== scannerInput) setTimeout(keepScannerReady, 0);
+    });
+    scannerInput.addEventListener('blur', () => {
+      scannerInput.classList.remove('scanner-focus');
+      if (lockFocusEl.checked) setTimeout(keepScannerReady, 50);
+    });
+    scannerInput.addEventListener('focus', () => scannerInput.classList.add('scanner-focus'));
+
+    const sig = document.getElementById('sig');
+    const sigCtx = sig.getContext('2d');
+    let drawing = false;
+    function getCanvasPoint(e, canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches ? e.touches[0] : e;
+      return { x: (touch.clientX - rect.left) * (canvas.width / rect.width), y: (touch.clientY - rect.top) * (canvas.height / rect.height) };
+    }
+    function startDraw(e) { drawing = true; const p = getCanvasPoint(e, sig); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y); e.preventDefault(); }
+    function moveDraw(e) { if (!drawing) return; const p = getCanvasPoint(e, sig); sigCtx.lineWidth = 3; sigCtx.lineCap = 'round'; sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y); e.preventDefault(); }
+    function endDraw(e) { drawing = false; sigCtx.beginPath(); e.preventDefault?.(); }
+    sig.addEventListener('mousedown', startDraw);
+    sig.addEventListener('mousemove', moveDraw);
+    sig.addEventListener('mouseup', endDraw);
+    sig.addEventListener('mouseleave', endDraw);
+    sig.addEventListener('touchstart', startDraw, { passive: false });
+    sig.addEventListener('touchmove', moveDraw, { passive: false });
+    sig.addEventListener('touchend', endDraw, { passive: false });
+    function clearSig() { sigCtx.clearRect(0, 0, sig.width, sig.height); }
+
+    function buildPayload() {
+      const rows = [];
+      Array.from(qcTable.querySelectorAll('tr')).forEach((tr) => {
+        const inputs = tr.querySelectorAll('input');
+        const data = {
+          serialNumber: inputs[0].value.trim(),
+          groundContinuityV: inputs[1].value,
+          hiPotA: inputs[2].value
+        };
+        if (data.serialNumber || data.groundContinuityV || data.hiPotA) rows.push(data);
+      });
+      return {
+        rows,
+        qcChecklist: {
+          visualInspection: document.getElementById('critVisual').checked,
+          wiringVerification: document.getElementById('critWiring').checked,
+          leakageTest: document.getElementById('critLeak').checked,
+          noiseVibration: document.getElementById('critNoise').checked,
+          verifyNameplate: document.getElementById('critNameplate').checked,
+          shutoffValve: document.getElementById('critValve').checked,
+          finalRunTest: document.getElementById('critFinalRun').checked
+        },
+        tester: document.getElementById('tester').value.trim(),
+        signature: sig.toDataURL(),
+        app: 'Heater QC Tool PWA - Serial Barcode Mode',
+        version: '3.2.0',
+        savedAt: new Date().toISOString()
+      };
+    }
+
+    function getSubmissionSummary(payload) {
+      const unitCount = payload.rows.length;
+      const checkedCount = Object.values(payload.qcChecklist).filter(Boolean).length;
+      return `${unitCount} unit(s) entered • ${checkedCount}/7 checklist item(s) checked • Tester: ${payload.tester || 'blank'}`;
+    }
+
+    function downloadData() {
+      const payload = buildPayload();
+      if (!payload.rows.length) { setStatus('No QC rows entered yet.', 'warn'); return; }
+      const fileName = `Heater_QC_${Date.now()}.json`;
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName; a.click();
+      URL.revokeObjectURL(url);
+      setStatus('QC JSON downloaded.', 'ok');
+      clearWholeForm();
+      setStatus('QC JSON downloaded. Form cleared for the next batch.', 'ok');
+    }
+
+    async function selectFolder() {
+      if (!window.showDirectoryPicker) { setStatus('This browser does not support folder picking. Download mode will be used.', 'warn'); return; }
+      try { folderHandle = await window.showDirectoryPicker(); setStatus('Save folder selected.', 'ok'); }
+      catch { setStatus('Folder selection cancelled.', 'warn'); }
+      keepScannerReady();
+    }
+
+    async function performSubmit() {
+      const payload = buildPayload();
+      const fileName = `Heater_QC_${Date.now()}.json`;
+      const content = JSON.stringify(payload, null, 2);
+      if (folderHandle) {
+        try {
+          const fh = await folderHandle.getFileHandle(fileName, { create: true });
+          const w = await fh.createWritable();
+          await w.write(content); await w.close();
+          clearWholeForm();
+          setStatus('QC data saved to selected folder. Form cleared for the next batch.', 'ok');
+          return;
+        } catch (err) {
+          console.error(err);
+          setStatus('Direct save failed. Falling back to download.', 'warn');
+        }
+      }
+      const blob = new Blob([content], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName; a.click();
+      URL.revokeObjectURL(url);
+      clearWholeForm();
+      setStatus('QC data downloaded. Form cleared for the next batch.', 'ok');
+    }
+
+    function openSubmitConfirmation() {
+      const payload = buildPayload();
+      if (!payload.rows.length) { setStatus('No QC rows entered yet.', 'warn'); return; }
+      submitSummary.textContent = getSubmissionSummary(payload);
+      if (typeof submitDialog.showModal === 'function') {
+        submitDialog.showModal();
+      } else {
+        // Fallback if dialog unsupported
+        const confirmed = confirm('Are you sure you want to submit this QC log? The whole form will be cleared after successful submission.\n\n' + getSubmissionSummary(payload));
+        if (confirmed) performSubmit();
+      }
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.classList.remove('hidden');
+      installNote.textContent = 'Install this QC tool to the device home screen for full-screen app mode.';
+    });
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      installBtn.classList.add('hidden');
+      installNote.textContent = 'If already installed, open it from the home screen for the best experience.';
+      keepScannerReady();
+    });
+    window.addEventListener('appinstalled', () => {
+      installBtn.classList.add('hidden');
+      installNote.textContent = 'App installed successfully.';
+      keepScannerReady();
+    });
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(console.error);
+
+    document.getElementById('addManualBtn').addEventListener('click', () => fillSerialValue(scannerInput.value, 'manual'));
+    document.getElementById('refocusBtn').addEventListener('click', keepScannerReady);
+    document.getElementById('nextRowBtn').addEventListener('click', () => { setActiveRow(findNextAvailableRow(activeRowIndex)); keepScannerReady(); });
+    document.getElementById('clearLastBtn').addEventListener('click', () => { lastScannedValue.value = ''; scannerInput.value = ''; setStatus('Last value cleared.', 'ok'); keepScannerReady(); });
+    document.getElementById('clearCurrentRowBtn').addEventListener('click', clearCurrentRow);
+    document.getElementById('addBlankRowBtn').addEventListener('click', () => { setActiveRow(activeRowIndex); scannerInput.focus(); setStatus(`Keep working on Row ${activeRowIndex + 1}.`, 'ok'); });
+    document.getElementById('clearSigBtn').addEventListener('click', () => { clearSig(); keepScannerReady(); });
+    document.getElementById('saveFolderBtn').addEventListener('click', selectFolder);
+    document.getElementById('submitBtn').addEventListener('click', openSubmitConfirmation);
+    document.getElementById('downloadBtn').addEventListener('click', downloadData);
+    document.getElementById('cancelSubmitBtn').addEventListener('click', () => { submitDialog.close(); keepScannerReady(); });
+    document.getElementById('confirmSubmitBtn').addEventListener('click', async () => { submitDialog.close(); await performSubmit(); });
+
+    buildTable();
+    setActiveRow(findFirstAvailableRow());
+    keepScannerReady();
+    setStatus('Waiting for barcode scan or manual entry… Tap Re-focus Scanner if the device stops capturing.');
+  </script>
+</body>
+</html>
